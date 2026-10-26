@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import time
 from decimal import Decimal
 
 import boto3
@@ -16,6 +17,12 @@ DEFAULT_LIMIT = 50
 MAX_LIMIT = 100
 # Upper bound on DynamoDB round trips per request when text filters drop most items
 MAX_PAGES = 10
+# After the index is found missing, skip it for this long before trying again,
+# so warm containers pick up the index soon after it's created
+INDEX_RETRY_SECONDS = 300
+
+# Per-container: monotonic time until which the index is assumed missing
+_index_missing_until = 0.0
 
 VALID_STATUSES = {'new', 'acknowledged', 'dispatched', 'resolved'}
 VALID_TYPES = {'suspicious_activity', 'theft', 'vandalism', 'traffic', 'fire',
@@ -115,6 +122,7 @@ def _collect(fetch, kwargs, limit, location, search, key_attrs):
 
 
 def lambda_handler(event, context):
+    global _index_missing_until
     try:
         table = dynamodb.Table(TABLE_NAME)
         params = event.get('queryStringParameters') or {}
@@ -131,7 +139,7 @@ def lambda_handler(event, context):
             base_kwargs['ExclusiveStartKey'] = _decode_token(params['nextToken'])
 
         items = last_key = None
-        if status_filter:
+        if status_filter and time.monotonic() >= _index_missing_until:
             # Query the GSI: reads only matching items, already sorted by timestamp
             kwargs = dict(base_kwargs,
                           IndexName=STATUS_INDEX_NAME,
@@ -145,7 +153,9 @@ def lambda_handler(event, context):
             except ClientError as e:
                 if not _is_missing_index(e):
                     raise
-                print(f"Index {STATUS_INDEX_NAME} unavailable, falling back to scan: {e}")
+                _index_missing_until = time.monotonic() + INDEX_RETRY_SECONDS
+                print(f"Index {STATUS_INDEX_NAME} unavailable, using scan for "
+                      f"{INDEX_RETRY_SECONDS}s: {e}")
 
         if items is None:
             # No index to query on, so fall back to a paginated scan.
