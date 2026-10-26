@@ -39,11 +39,10 @@ export async function submitIncident(incident) {
   return data
 }
 
-// While STATUS_API_ENABLED is false, this updates the status optimistically
-// in the UI only (persisted to localStorage so it survives refresh/navigation
-// within this browser). Once the submit-report Lambda's 'update_status'
-// action is deployed, flip STATUS_API_ENABLED in config.js and this calls it
-// for real — the server becomes the source of truth instead of localStorage.
+// Saves the status through the submit-report Lambda's 'update_status' action.
+// The server only accepts the next step in the workflow and replies 409 if the
+// incident has already moved on. With STATUS_API_ENABLED off, the change is
+// kept in localStorage instead, so it only shows in this browser.
 export async function updateStatus(incident, newStatus) {
   if (!STATUS_API_ENABLED) {
     setStatusOverride(incident.incidentId, newStatus)
