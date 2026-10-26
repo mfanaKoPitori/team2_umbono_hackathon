@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, User, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import SeverityPill from './SeverityPill'
 import SparkleLabel from './SparkleLabel'
 import StatusBar from './StatusBar'
@@ -55,10 +55,6 @@ export default function IncidentQueueCard({ incident, isNew, onAction }) {
             {incident.location}
           </span>
         )}
-        <span className="queue-card__fact">
-          <User size={14} />
-          {incident.isAnonymous ? 'Anonymous' : incident.reporterName || 'Anonymous'}
-        </span>
       </div>
 
       {incident.photoUrl && (
