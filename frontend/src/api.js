@@ -7,16 +7,30 @@ if (STATUS_API_ENABLED) {
   clearStatusOverrides()
 }
 
+// The API returns at most 100 incidents per page and an unfiltered list comes
+// from a scan, so any single page can miss new incidents. Follow nextToken to
+// get them all, up to MAX_PAGES requests per load.
+const PAGE_SIZE = 100
+const MAX_PAGES = 10
+
 export async function fetchIncidents() {
-  const res = await fetch(API_URL)
-  if (!res.ok) {
-    throw new Error(`Failed to load incidents (${res.status})`)
+  const all = []
+  let nextToken = null
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const url = new URL(API_URL)
+    url.searchParams.set('limit', PAGE_SIZE)
+    if (nextToken) url.searchParams.set('nextToken', nextToken)
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new Error(`Failed to load incidents (${res.status})`)
+    }
+    const data = await res.json()
+    all.push(...(data.incidents ?? []))
+    nextToken = data.nextToken
+    if (!nextToken) break
   }
-  const data = await res.json()
-  const incidents = STATUS_API_ENABLED
-    ? (data.incidents ?? [])
-    : applyStatusOverrides(data.incidents ?? [])
-  return { ...data, incidents }
+  const incidents = STATUS_API_ENABLED ? all : applyStatusOverrides(all)
+  return { incidents, count: incidents.length }
 }
 
 export async function submitIncident(incident) {
