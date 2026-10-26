@@ -76,9 +76,9 @@ parameters return `400` with an `error` message listing allowed values.
 Things to know:
 
 - **Status index.** `?status=` queries the GSI `status-timestamp-index`
-  (partition `status`, sort `timestamp`). It doesn't exist yet — we can't
-  create it — so the lambda falls back to a scan and retries the index every
-  5 minutes. Sorting by time is only exact across pages once the index exists.
+  (partition `status`, sort `timestamp`), so results are sorted by time across
+  pages. If the index is ever unavailable, the lambda falls back to a scan
+  (sorted within each page only) and retries the index every 5 minutes.
 - **Severity sort** applies within each page, not across all incidents.
 - **Photos.** Incidents whose `photoUrl` points into the team 2 bucket also get
   `photoViewUrl`, a signed link valid for 1 hour. Use it in `<img>` tags; the
