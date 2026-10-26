@@ -139,31 +139,6 @@
   color: var(--accent);
 }
 
-/* ---------- Severity grid ---------- */
-
-.severity-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.severity-tile {
-  min-height: 56px;
-  padding: 10px 4px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--navy-border);
-  background: var(--navy-panel);
-  color: var(--text-muted);
-  font-weight: 800;
-  font-size: 0.82rem;
-}
-
-.severity-tile.is-selected {
-  background: var(--tile-soft);
-  border-color: var(--tile-color);
-  color: var(--tile-color);
-}
-
 /* ---------- Location capture ---------- */
 
 .location-capture {
