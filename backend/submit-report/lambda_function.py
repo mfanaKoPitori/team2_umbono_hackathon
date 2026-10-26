@@ -10,7 +10,7 @@ bedrock = boto3.client('bedrock-runtime')
 TABLE_NAME = os.environ['TABLE_NAME']
 BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-haiku-5-5')
 
-VALID_TYPES = {'suspicious_activity', 'theft', 'traffic', 'assault', 'infrastructure', 'other'}
+VALID_TYPES = {'suspicious_activity', 'theft', 'vandalism', 'traffic', 'fire', 'medical', 'noise', 'infrastructure', 'other'}
 VALID_SEVERITIES = {'critical', 'high', 'medium', 'low'}
 PHOTO_URL_PREFIX = 'https://umbono-hackathon-team2-photos.s3'
 HEADERS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
