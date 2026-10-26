@@ -52,7 +52,7 @@ indexes), read bucket settings or see IAM roles. Ask the organisers for those.
 | `status` | `new` → `acknowledged` → `dispatched` → `resolved` |
 | `acknowledgedAt`, `dispatchedAt`, `resolvedAt`, `updatedAt` | ISO-8601, set by status changes; absent until that step happens |
 | `statusHistory` | `[{"status", "at"}, ...]`, oldest first |
-| `latitude`, `longitude`, `photoUrl`, `isAnonymous`, `reportedSeverity`, `source` | From `submit-report`. Coordinates are stored as strings |
+| `latitude`, `longitude`, `photoUrl`, `isAnonymous`, `source` | From `submit-report`. Coordinates are stored as strings. Older incidents may also have `reportedSeverity`, the reporter's own rating, which is no longer collected |
 
 Seeded and older incidents may lack the fields that `submit-report` adds.
 
@@ -140,6 +140,23 @@ await fetch(`${API}/reports`, { method: 'POST', headers: { 'Content-Type': 'appl
 The upload link comes from `GET /reports` so no new AWS resources are needed;
 it would sit better on its own endpoint if the organisers can add one. Photos uploaded for reports
 that are never submitted stay in the bucket.
+
+## Live updates
+
+The frontend polls `GET /reports` (`frontend/src/hooks/usePolling.js`) rather
+than using WebSockets or SSE, which would need a WebSocket API, a connections
+table and DynamoDB streams on the incidents table — resources we can't create.
+
+- **Dashboard:** every 5 s while visible and every 30 s in a background tab.
+  New incidents, and status changes made by other responders, flash for a few
+  seconds. While the tab is in the background the title shows a count, e.g.
+  `(2) Siyabona · …`.
+- **Resident confirmation page:** every 5 s, paused while the tab is hidden.
+- Both refresh as soon as the tab is shown again or the browser comes back
+  online. Only one request runs at a time. After a failure the wait doubles
+  (up to 1 minute), and the dashboard's Live pill shows **Reconnecting**.
+- A poll that was in flight when a responder changed a status is discarded,
+  so it can't briefly undo the change on screen.
 
 ## Tests
 

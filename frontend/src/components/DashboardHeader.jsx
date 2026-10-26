@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import Logo from './Logo'
 import { useTick } from '../hooks/useTick'
 
-export default function DashboardHeader({ lastUpdated }) {
+export default function DashboardHeader({ lastUpdated, offline }) {
   useTick(1000)
   const seconds = lastUpdated ? Math.max(0, Math.round((Date.now() - lastUpdated) / 1000)) : null
 
@@ -11,9 +11,9 @@ export default function DashboardHeader({ lastUpdated }) {
     <header className="dash-header">
       <Logo subtitle="Community Safety Command Centre" />
       <div className="dash-header__right">
-        <span className="pill pill--live">
+        <span className={`pill pill--live ${offline ? 'pill--offline' : ''}`} role="status">
           <span className="pill__dot" />
-          <span>Live</span>
+          <span>{offline ? 'Reconnecting' : 'Live'}</span>
           {seconds != null && <span className="pill--live__detail">{` · updated ${seconds}s ago`}</span>}
         </span>
         <Link to="/report" className="btn btn--primary">

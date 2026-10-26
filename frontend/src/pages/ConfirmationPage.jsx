@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { CheckCircle2, ShieldAlert } from 'lucide-react'
 import ResidentHeader from '../components/ResidentHeader'
@@ -8,6 +8,7 @@ import SparkleLabel from '../components/SparkleLabel'
 import StatusTracker from '../components/StatusTracker'
 import { useLanguage } from '../i18n.jsx'
 import { fetchIncidents } from '../api'
+import { usePolling } from '../hooks/usePolling'
 import { refCode } from '../utils/incidentStats'
 import './Confirmation.css'
 
@@ -19,27 +20,17 @@ export default function ConfirmationPage() {
   const [loading, setLoading] = useState(true)
   const [submittedAt] = useState(() => new Date())
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const data = await fetchIncidents()
-        if (cancelled) return
-        const match = (data.incidents ?? []).find((i) => i.incidentId === id)
-        if (match) setIncident(match)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    const timer = setInterval(load, 10000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchIncidents()
+      const match = (data.incidents ?? []).find((i) => i.incidentId === id)
+      if (match) setIncident(match)
+    } finally {
+      setLoading(false)
     }
   }, [id])
+
+  usePolling(load, 5000)
 
   const time = (incident ? new Date(incident.createdAt) : submittedAt).toLocaleTimeString(
     undefined,

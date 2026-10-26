@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { TriangleAlert, X } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import KpiCards from '../components/KpiCards'
@@ -22,14 +23,21 @@ export default function DashboardPage() {
     error,
     lastUpdated,
     highlighted,
+    unseen,
     setStatus,
     statusError,
     dismissStatusError,
-  } = useIncidents({ pollMs: 10000 })
+  } = useIncidents({ pollMs: 5000 })
+
+  // Show activity in the tab title while the dashboard is in the background
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\) /, '')
+    document.title = unseen > 0 ? `(${unseen}) ${base}` : base
+  }, [unseen])
 
   return (
     <div className="page dash">
-      <DashboardHeader lastUpdated={lastUpdated} />
+      <DashboardHeader lastUpdated={lastUpdated} offline={Boolean(error)} />
 
       <main className="dash__main">
         <div className="dash__greeting">
