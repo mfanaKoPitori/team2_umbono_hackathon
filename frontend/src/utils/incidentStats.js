@@ -34,6 +34,36 @@ export function medianOpenAge(incidents) {
   return ages.length % 2 === 0 ? (ages[mid - 1] + ages[mid]) / 2 : ages[mid]
 }
 
+// Median minutes between two ISO-timestamp fields, counting only incidents
+// that actually have `endField` set (e.g. acknowledgedAt/resolvedAt haven't
+// existed until the status-workflow endpoint shipped).
+export function medianDuration(incidents, startField, endField) {
+  const durations = incidents
+    .filter((i) => i[endField])
+    .map((i) => {
+      const start = new Date(i[startField]).getTime()
+      const end = new Date(i[endField]).getTime()
+      if (Number.isNaN(start) || Number.isNaN(end)) return null
+      return Math.max(0, (end - start) / 60000)
+    })
+    .filter((v) => v != null)
+    .sort((a, b) => a - b)
+
+  if (durations.length === 0) return null
+  const mid = Math.floor(durations.length / 2)
+  return durations.length % 2 === 0
+    ? (durations[mid - 1] + durations[mid]) / 2
+    : durations[mid]
+}
+
+export function medianTimeToAcknowledge(incidents) {
+  return medianDuration(incidents, 'createdAt', 'acknowledgedAt')
+}
+
+export function medianTimeToResolve(incidents) {
+  return medianDuration(incidents, 'createdAt', 'resolvedAt')
+}
+
 export function categoryCounts(incidents) {
   const counts = {}
   for (const incident of incidents) {

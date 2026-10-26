@@ -118,7 +118,7 @@ export default function IncidentMap({ incidents, onAction }) {
                         <button
                           type="button"
                           className="btn btn--primary btn--sm btn--block"
-                          onClick={() => onAction(incident.incidentId, action.next)}
+                          onClick={() => onAction(incident, action.next)}
                         >
                           {action.label}
                         </button>

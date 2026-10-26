@@ -53,7 +53,7 @@
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
 }
 
@@ -438,6 +438,12 @@
   font-size: 0.78rem;
   color: var(--text-muted);
   text-align: right;
+}
+
+.analytics-panel__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .analytics-panel__stat {

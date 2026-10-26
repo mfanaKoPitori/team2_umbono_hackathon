@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react'
+import { TriangleAlert, X } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import KpiCards from '../components/KpiCards'
 import IncidentMap from '../components/IncidentMap'
@@ -16,9 +16,16 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { incidents, loading, error, lastUpdated, highlighted, setStatus } = useIncidents({
-    pollMs: 10000,
-  })
+  const {
+    incidents,
+    loading,
+    error,
+    lastUpdated,
+    highlighted,
+    setStatus,
+    statusError,
+    dismissStatusError,
+  } = useIncidents({ pollMs: 10000 })
 
   return (
     <div className="page dash">
@@ -34,6 +41,21 @@ export default function DashboardPage() {
           <div className="alert alert--error">
             <TriangleAlert size={16} />
             <span>{error}</span>
+          </div>
+        )}
+
+        {statusError && (
+          <div className="alert alert--error">
+            <TriangleAlert size={16} />
+            <span>{statusError}</span>
+            <button
+              type="button"
+              className="alert__dismiss"
+              onClick={dismissStatusError}
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 

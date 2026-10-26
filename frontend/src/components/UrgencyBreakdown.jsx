@@ -1,9 +1,19 @@
 import { SEVERITIES, SEVERITY_META } from '../constants'
-import { severityCounts, medianOpenAge, formatAge } from '../utils/incidentStats'
+import {
+  severityCounts,
+  medianOpenAge,
+  medianTimeToAcknowledge,
+  medianTimeToResolve,
+  formatAge,
+} from '../utils/incidentStats'
 
 export default function UrgencyBreakdown({ incidents }) {
   const counts = severityCounts(incidents, SEVERITIES)
   const max = Math.max(1, ...counts.map((c) => c.count))
+
+  const timeToAck = medianTimeToAcknowledge(incidents)
+  const timeToResolve = medianTimeToResolve(incidents)
+  const hasTimingData = timeToAck != null || timeToResolve != null
   const medianAge = medianOpenAge(incidents)
 
   return (
@@ -26,9 +36,29 @@ export default function UrgencyBreakdown({ incidents }) {
           )
         })}
       </div>
-      <div className="analytics-panel__stat">
-        <span className="analytics-panel__stat-label">Median age, open incidents</span>
-        <span className="analytics-panel__stat-value mono">{formatAge(medianAge)}</span>
+
+      <div className="analytics-panel__stats">
+        {hasTimingData ? (
+          <>
+            {timeToAck != null && (
+              <div className="analytics-panel__stat">
+                <span className="analytics-panel__stat-label">Median time to acknowledge</span>
+                <span className="analytics-panel__stat-value mono">{formatAge(timeToAck)}</span>
+              </div>
+            )}
+            {timeToResolve != null && (
+              <div className="analytics-panel__stat">
+                <span className="analytics-panel__stat-label">Median time to resolve</span>
+                <span className="analytics-panel__stat-value mono">{formatAge(timeToResolve)}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="analytics-panel__stat">
+            <span className="analytics-panel__stat-label">Median age, open incidents</span>
+            <span className="analytics-panel__stat-value mono">{formatAge(medianAge)}</span>
+          </div>
+        )}
       </div>
     </div>
   )

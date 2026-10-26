@@ -9,6 +9,7 @@ export function useIncidents({ pollMs = 10000 } = {}) {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [highlighted, setHighlighted] = useState(() => new Set())
+  const [statusError, setStatusError] = useState(null)
   const knownIds = useRef(new Set())
   const isFirstLoad = useRef(true)
 
@@ -52,12 +53,35 @@ export function useIncidents({ pollMs = 10000 } = {}) {
     return () => clearInterval(id)
   }, [load, pollMs])
 
-  const setStatus = useCallback(async (incidentId, newStatus) => {
+  const setStatus = useCallback(async (incident, newStatus) => {
+    const { incidentId, status: previousStatus } = incident
+
     setIncidents((prev) =>
       prev.map((i) => (i.incidentId === incidentId ? { ...i, status: newStatus } : i)),
     )
-    await apiUpdateStatus(incidentId, newStatus)
+
+    try {
+      await apiUpdateStatus(incident, newStatus)
+      setStatusError(null)
+    } catch (err) {
+      // Roll back the optimistic update — the server rejected the change
+      // (e.g. a 409 because someone else already moved it past this step).
+      setIncidents((prev) =>
+        prev.map((i) => (i.incidentId === incidentId ? { ...i, status: previousStatus } : i)),
+      )
+      setStatusError(err.message)
+    }
   }, [])
 
-  return { incidents, loading, error, lastUpdated, highlighted, reload: load, setStatus }
+  return {
+    incidents,
+    loading,
+    error,
+    lastUpdated,
+    highlighted,
+    reload: load,
+    setStatus,
+    statusError,
+    dismissStatusError: () => setStatusError(null),
+  }
 }

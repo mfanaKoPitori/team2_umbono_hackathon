@@ -72,7 +72,7 @@ export default function IncidentQueueCard({ incident, isNew, onAction }) {
           <button
             type="button"
             className="btn btn--primary"
-            onClick={() => onAction(incident.incidentId, action.next)}
+            onClick={() => onAction(incident, action.next)}
           >
             {action.label}
           </button>

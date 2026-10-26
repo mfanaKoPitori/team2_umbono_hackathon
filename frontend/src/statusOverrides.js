@@ -20,3 +20,7 @@ export function applyStatusOverrides(incidents) {
     all[incident.incidentId] ? { ...incident, status: all[incident.incidentId] } : incident,
   )
 }
+
+export function clearStatusOverrides() {
+  localStorage.removeItem(STORAGE_KEY)
+}
