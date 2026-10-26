@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / React frontend
+node_modules/
+build/
+dist/
+
+# Lambda deployment packages
+*.zip
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local worktrees and settings
+.claude/
