@@ -80,18 +80,37 @@ Things to know:
   `photoViewUrl`, a signed link valid for 1 hour. Use it in `<img>` tags; the
   plain `photoUrl` may not be publicly readable. (Branch `feature/photo-uploads`.)
 
-## Photo uploads — open question
+## Photo uploads
 
-`todo_2` has the frontend send a finished `photoUrl` with the report, so the
-browser must upload to S3 *before* submitting. Nothing issues upload links
-yet. Options:
+The bucket is private, so the browser uploads with a short-lived signed link
+and displays photos through signed links. Three steps:
 
-1. `submit-report` returns a presigned S3 POST after creating the incident
-   (upload after submit), or
-2. a separate endpoint returns a presigned POST before submitting — needs a new
-   Lambda and API route from the organisers.
+1. **Get an upload link:** `GET /reports?photoUpload=image/jpeg` (or
+   `image/png`, `image/webp`) returns
+   `{"photoUpload": {"url", "fields"}, "photoUrl", "maxBytes", "expiresIn"}`.
+   The link is valid for 5 minutes.
+2. **Upload straight to S3:** `POST` a `FormData` to `photoUpload.url` with
+   every entry of `photoUpload.fields` first and the file last, as `file`.
+   S3 returns `204`, and rejects other file types (`403`) or files over 5 MB
+   (`400`).
+3. **Submit the report** with `"photoUrl": <photoUrl from step 1>` — the
+   `todo_2` version of `submit-report` validates and stores it.
 
-Either way, presigned POST can restrict uploads to images up to 5 MB.
+```js
+const res = await fetch(`${API}/reports?photoUpload=${encodeURIComponent(file.type)}`);
+const { photoUpload, photoUrl } = await res.json();
+const form = new FormData();
+Object.entries(photoUpload.fields).forEach(([k, v]) => form.append(k, v));
+form.append('file', file);
+const upload = await fetch(photoUpload.url, { method: 'POST', body: form });
+if (!upload.ok) throw new Error('Photo upload failed');
+await fetch(`${API}/reports`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...report, photoUrl }) });
+```
+
+The upload link comes from `GET /reports` so no new AWS resources are needed;
+it would sit better on its own endpoint if the organisers can add one. Photos uploaded for reports
+that are never submitted stay in the bucket.
 
 ## Tests
 

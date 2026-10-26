@@ -83,6 +83,13 @@ class FakeS3:
         self.presigned.append((operation, Params, ExpiresIn))
         return f"https://signed.example/{Params['Bucket']}/{Params['Key']}?expires={ExpiresIn}"
 
+    def generate_presigned_post(self, Bucket, Key, Fields, Conditions, ExpiresIn):
+        self.presigned.append(('post_object', {'Bucket': Bucket, 'Key': Key,
+                                               'Fields': Fields, 'Conditions': Conditions},
+                               ExpiresIn))
+        return {'url': f'https://{Bucket}.s3.example/',
+                'fields': dict(Fields, key=Key, policy='signed-policy')}
+
 
 TABLE = FakeTable()
 S3 = FakeS3()

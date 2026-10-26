@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import time
+import uuid
 from decimal import Decimal
 from urllib.parse import unquote, urlparse
 
@@ -19,6 +20,9 @@ REGION = os.environ.get('AWS_REGION', 'af-south-1')
 s3 = boto3.client('s3', region_name=REGION, endpoint_url=f'https://s3.{REGION}.amazonaws.com',
                   config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}))
 PHOTO_URL_EXPIRY_SECONDS = 3600
+PHOTO_UPLOAD_EXPIRY_SECONDS = 300
+MAX_PHOTO_BYTES = 5 * 1024 * 1024
+PHOTO_TYPES = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
 # GSI with partition key `status` and sort key `timestamp`
 STATUS_INDEX_NAME = os.environ.get('STATUS_INDEX_NAME', 'status-timestamp-index')
 
@@ -136,6 +140,31 @@ def _add_photo_view_url(item):
             ExpiresIn=PHOTO_URL_EXPIRY_SECONDS)
 
 
+def _photo_upload(content_type):
+    """Presigned S3 POST for uploading one photo before submitting a report.
+
+    The browser posts the file to `photoUpload.url` with `photoUpload.fields`,
+    then sends `photoUrl` with POST /reports. S3 enforces the type and size.
+    """
+    if not BUCKET_NAME:
+        raise RuntimeError('BUCKET_NAME is not configured')
+    if content_type not in PHOTO_TYPES:
+        raise BadRequest(f"photoUpload must be one of: {', '.join(sorted(PHOTO_TYPES))}")
+    key = f'photos/{uuid.uuid4()}.{PHOTO_TYPES[content_type]}'
+    upload = s3.generate_presigned_post(
+        BUCKET_NAME, key,
+        Fields={'Content-Type': content_type},
+        Conditions=[{'Content-Type': content_type},
+                    ['content-length-range', 1, MAX_PHOTO_BYTES]],
+        ExpiresIn=PHOTO_UPLOAD_EXPIRY_SECONDS)
+    return {
+        'photoUpload': upload,
+        'photoUrl': f'https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{key}',
+        'maxBytes': MAX_PHOTO_BYTES,
+        'expiresIn': PHOTO_UPLOAD_EXPIRY_SECONDS,
+    }
+
+
 def _matches_text(item, location, search):
     # Case-insensitive substring matching; DynamoDB's contains() is case-sensitive
     if location and location not in str(item.get('location', '')).lower():
@@ -173,6 +202,9 @@ def lambda_handler(event, context):
     try:
         table = dynamodb.Table(TABLE_NAME)
         params = event.get('queryStringParameters') or {}
+        if 'photoUpload' in params:
+            # Lives here because there is no separate upload route yet
+            return _response(200, _photo_upload(params['photoUpload']))
         status_filter = _parse_choice(params, 'status', VALID_STATUSES)
         type_filter = _parse_choice(params, 'type', VALID_TYPES)
         sort = _parse_choice(params, 'sort', {'timestamp', 'severity'}, 'timestamp')

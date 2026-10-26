@@ -348,6 +348,59 @@ class PhotoUrlTests(GetReportsTestCase):
         self.assertIsNone(url)
 
 
+class PhotoUploadTests(GetReportsTestCase):
+    # Prefix the todo_2 submit-report lambda requires for photoUrl
+    SUBMIT_REPORT_PHOTO_PREFIX = 'https://test-photos.s3'
+
+    def test_returns_presigned_post_and_photo_url(self):
+        status, body = invoke({'photoUpload': 'image/jpeg'})
+        self.assertEqual(status, 200)
+        operation, params, expires = S3.presigned[0]
+        self.assertEqual(operation, 'post_object')
+        self.assertEqual(expires, 300)
+        self.assertRegex(params['Key'], r'^photos/[0-9a-f-]{36}\.jpg$')
+        self.assertEqual(body['photoUpload']['fields']['key'], params['Key'])
+        self.assertEqual(body['photoUrl'],
+                         f"https://test-photos.s3.af-south-1.amazonaws.com/{params['Key']}")
+        self.assertEqual(body['maxBytes'], 5 * 1024 * 1024)
+        self.assertEqual(TABLE.calls, [])
+
+    def test_upload_enforces_type_and_size(self):
+        invoke({'photoUpload': 'image/png'})
+        _, params, _ = S3.presigned[0]
+        self.assertEqual(params['Fields'], {'Content-Type': 'image/png'})
+        self.assertIn({'Content-Type': 'image/png'}, params['Conditions'])
+        self.assertIn(['content-length-range', 1, 5 * 1024 * 1024], params['Conditions'])
+        self.assertTrue(params['Key'].endswith('.png'))
+
+    def test_each_upload_gets_a_new_key(self):
+        _, first = invoke({'photoUpload': 'image/webp'})
+        _, second = invoke({'photoUpload': 'image/webp'})
+        self.assertNotEqual(first['photoUrl'], second['photoUrl'])
+
+    def test_photo_url_works_with_submit_report_and_photo_view_url(self):
+        _, body = invoke({'photoUpload': 'image/jpeg'})
+        self.assertTrue(body['photoUrl'].startswith(self.SUBMIT_REPORT_PHOTO_PREFIX))
+        self.assertEqual(lf._photo_key(body['photoUrl']), body['photoUpload']['fields']['key'])
+
+    def test_rejects_other_content_types(self):
+        for content_type in ('image/gif', 'application/pdf', 'text/html', ''):
+            with self.subTest(content_type):
+                status, body = invoke({'photoUpload': content_type})
+                self.assertEqual(status, 400)
+                self.assertEqual(body['error'],
+                                 'photoUpload must be one of: image/jpeg, image/png, image/webp')
+        self.assertEqual(S3.presigned, [])
+
+    def test_fails_when_bucket_not_configured(self):
+        lf.BUCKET_NAME, original = None, lf.BUCKET_NAME
+        try:
+            status, _ = invoke({'photoUpload': 'image/jpeg'})
+        finally:
+            lf.BUCKET_NAME = original
+        self.assertEqual(status, 500)
+
+
 class ValidationTests(GetReportsTestCase):
     def test_invalid_params_return_400(self):
         not_a_dict = base64.urlsafe_b64encode(b'[1]').decode()
