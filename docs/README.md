@@ -50,7 +50,11 @@ indexes), read bucket settings or see IAM roles. Ask the organisers for those.
 | `severity` | From Bedrock: `critical`, `high`, `medium`, `low` |
 | `aiSummary`, `aiCategory` | From Bedrock |
 | `status` | `new` → `acknowledged` → `dispatched` → `resolved` |
-| `latitude`, `longitude`, `photoUrl`, `isAnonymous`, `reportedSeverity` | Added on branch `todo_2` (not merged yet). Coordinates are stored as strings |
+| `acknowledgedAt`, `dispatchedAt`, `resolvedAt`, `updatedAt` | ISO-8601, set by status changes; absent until that step happens |
+| `statusHistory` | `[{"status", "at"}, ...]`, oldest first |
+| `latitude`, `longitude`, `photoUrl`, `isAnonymous`, `reportedSeverity`, `source` | From `submit-report`. Coordinates are stored as strings |
+
+Seeded and older incidents may lack the fields that `submit-report` adds.
 
 ## `GET /reports`
 
@@ -78,7 +82,32 @@ Things to know:
 - **Severity sort** applies within each page, not across all incidents.
 - **Photos.** Incidents whose `photoUrl` points into the team 2 bucket also get
   `photoViewUrl`, a signed link valid for 1 hour. Use it in `<img>` tags; the
-  plain `photoUrl` may not be publicly readable. (Branch `feature/photo-uploads`.)
+  plain `photoUrl` may not be publicly readable.
+
+## Status workflow
+
+Responders move an incident one step at a time with `POST /reports`
+(handled by `team2-submit-report`):
+
+```
+{"action": "update_status", "incidentId": "...", "timestamp": "...", "status": "acknowledged"}
+```
+
+`incidentId` and `timestamp` are the incident's table key, as returned by
+`GET /reports`. `status` must be the step after the current one
+(`acknowledged`, then `dispatched`, then `resolved`). The change sets the
+matching `*At` field, `updatedAt`, and appends to `statusHistory`.
+
+| Response | When |
+|---|---|
+| `200` `{"message", "incidentId", "status", "updatedAt"}` | Status changed |
+| `400` `{"error", "details"}` | Missing key, or `status` isn't a valid step |
+| `409` `{"error"}` | Incident not found, or not at the previous step (e.g. another responder already moved it) |
+
+The dashboard updates the card straight away, undoes it if the server
+refuses, and then reloads to show the real status. `STATUS_API_ENABLED` in
+`frontend/src/config.js` switches between saving to the server and keeping
+changes in the browser only.
 
 ## Photo uploads
 
@@ -137,7 +166,6 @@ teammate's work (`aws lambda get-function` returns a download link).
 ## Branches
 
 Name feature branches `feature/<kebab-case-name>`, e.g.
-`feature/todo-item-1-bedrock`, `feature/photo-uploads`. Lambda code currently
-lives in three places across branches (`lambdas/get_reports/`,
-`backend/submit-report/`, `team2-submit-report/`) — worth agreeing on one
-layout before merging.
+`feature/photo-uploads`, `feature/status-workflow`. On `main`, the get
+lambda lives in `lambdas/get_reports/`, the submit lambda in
+`team2-submit-report/`, and the React app in `frontend/`.

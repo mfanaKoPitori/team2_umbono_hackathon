@@ -70,8 +70,10 @@ export function useIncidents({ pollMs = 10000 } = {}) {
         prev.map((i) => (i.incidentId === incidentId ? { ...i, status: previousStatus } : i)),
       )
       setStatusError(err.message)
+      // Pick up the status the server actually has, so the next action is right
+      load()
     }
-  }, [])
+  }, [load])
 
   return {
     incidents,

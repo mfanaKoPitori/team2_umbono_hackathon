@@ -22,8 +22,8 @@ export const SEVERITY_META = {
 }
 
 // 4-step lifecycle shown on both the dashboard status bar and the resident
-// tracker. "resolved" only ever exists client-side via updateStatus() — see
-// api.js — since the backend has no status-update endpoint yet.
+// tracker. Each step can only follow the previous one; the backend enforces
+// this and stamps acknowledgedAt / dispatchedAt / resolvedAt.
 export const STATUS_STEPS = ['new', 'acknowledged', 'dispatched', 'resolved']
 
 export function incidentTypeMeta(value) {
