@@ -5,18 +5,17 @@ import { Navigation, Camera, X, Check, TriangleAlert, LoaderCircle, UserX } from
 import ResidentHeader from '../components/ResidentHeader'
 import Footer from '../components/Footer'
 import { Icon } from '../icons.jsx'
-import { INCIDENT_TYPES, SEVERITIES, SEVERITY_META } from '../constants'
+import { INCIDENT_TYPES } from '../constants'
 import { useLanguage } from '../i18n.jsx'
 import { submitIncident, uploadPhoto } from '../api'
 import './Report.css'
 
 export default function ReportPage() {
   const navigate = useNavigate()
-  const { t, typeLabel, severityLabel } = useLanguage()
+  const { t, typeLabel } = useLanguage()
   const fileInputRef = useRef(null)
 
   const [incidentType, setIncidentType] = useState(INCIDENT_TYPES[0].value)
-  const [severity, setSeverity] = useState('medium')
   const [location, setLocation] = useState('')
   const [coords, setCoords] = useState(null)
   const [locating, setLocating] = useState(false)
@@ -87,7 +86,6 @@ export default function ReportPage() {
       const photoUrl = photoFile ? await uploadPhoto(photoFile) : null
       const payload = {
         incidentType,
-        severity,
         location: location.trim(),
         description: description.trim(),
         isAnonymous,
@@ -129,27 +127,6 @@ export default function ReportPage() {
               </button>
             )
           })}
-        </div>
-
-        <div className="field">
-          <span className="field__label">{t('severityQuestion')}</span>
-          <div className="severity-grid">
-            {SEVERITIES.map((level) => {
-              const meta = SEVERITY_META[level]
-              const active = severity === level
-              return (
-                <button
-                  key={level}
-                  type="button"
-                  className={`severity-tile ${active ? 'is-selected' : ''}`}
-                  style={{ '--tile-color': meta.color, '--tile-soft': meta.soft }}
-                  onClick={() => setSeverity(level)}
-                >
-                  {severityLabel(level)}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         <label className="field">

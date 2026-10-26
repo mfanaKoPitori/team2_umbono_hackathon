@@ -24,7 +24,6 @@ const TRANSLATIONS = {
   en: {
     title: 'What happened?',
     subtitle: 'Pick the closest match. Our AI double-checks it.',
-    severityQuestion: 'How serious is it?',
     whereLabel: 'Where?',
     useLocation: 'Use my current location',
     locationFound: 'Location found',
@@ -39,7 +38,6 @@ const TRANSLATIONS = {
     errorDescription: 'Please add a few words about what happened',
     errorLocation: 'Add a location, or use your current location',
     errorGeneric: 'Something went wrong. Please try again.',
-    severities: { critical: 'Emergency', high: 'Serious', medium: 'Moderate', low: 'Minor' },
     types: {
       suspicious_activity: 'Suspicious',
       theft: 'Theft',
@@ -53,7 +51,7 @@ const TRANSLATIONS = {
     },
     reportSent: 'Report sent',
     refLabel: 'Ref',
-    aiTriageTitle: 'AI triage',
+    aiTriageTitle: 'AI-assessed priority',
     whatNext: 'What happens next',
     steps: {
       new: 'Received and triaged',
@@ -71,7 +69,6 @@ const TRANSLATIONS = {
   zu: {
     title: 'Kwenzekeni?',
     subtitle: 'Khetha okufana kakhulu. I-AI izokuhlola.',
-    severityQuestion: 'Kubi kangakanani?',
     whereLabel: 'Kuphi?',
     useLocation: 'Sebenzisa indawo yami',
     locationFound: 'Indawo itholakele',
@@ -86,7 +83,6 @@ const TRANSLATIONS = {
     errorDescription: 'Sicela ufake imininingwane yalokho okwenzekile',
     errorLocation: 'Faka indawo, noma usebenzise indawo yakho yamanje',
     errorGeneric: 'Kukhona okungahambanga kahle. Sicela uzame futhi.',
-    severities: { critical: 'Kuyaphuthuma', high: 'Kubi', medium: 'Kumaphakathi', low: 'Kuncane' },
     types: {
       suspicious_activity: 'Okusolisayo',
       theft: 'Ukweba',
@@ -100,7 +96,7 @@ const TRANSLATIONS = {
     },
     reportSent: 'Umbiko uthunyelwe',
     refLabel: 'Inombolo',
-    aiTriageTitle: 'Ukuhlolwa yi-AI',
+    aiTriageTitle: 'Ukubaluleka okuhlolwe yi-AI',
     whatNext: 'Okulandelayo',
     steps: {
       new: 'Itholiwe futhi ihloliwe',
@@ -118,7 +114,6 @@ const TRANSLATIONS = {
   af: {
     title: 'Wat het gebeur?',
     subtitle: 'Kies die naaste opsie. Ons KI kontroleer dit.',
-    severityQuestion: 'Hoe ernstig is dit?',
     whereLabel: 'Waar?',
     useLocation: 'Gebruik my huidige ligging',
     locationFound: 'Ligging gevind',
@@ -133,7 +128,6 @@ const TRANSLATIONS = {
     errorDescription: "Voeg asseblief 'n paar woorde by oor wat gebeur het",
     errorLocation: "Voeg 'n ligging by, of gebruik jou huidige ligging",
     errorGeneric: 'Iets het verkeerd geloop. Probeer asseblief weer.',
-    severities: { critical: 'Noodgeval', high: 'Ernstig', medium: 'Matig', low: 'Gering' },
     types: {
       suspicious_activity: 'Verdag',
       theft: 'Diefstal',
@@ -147,7 +141,7 @@ const TRANSLATIONS = {
     },
     reportSent: 'Verslag gestuur',
     refLabel: 'Verw',
-    aiTriageTitle: 'KI-triage',
+    aiTriageTitle: 'KI-bepaalde prioriteit',
     whatNext: 'Wat volgende gebeur',
     steps: {
       new: 'Ontvang en getrieer',
@@ -176,7 +170,6 @@ export function LanguageProvider({ children }) {
       setLang,
       t: (key) => dict[key] ?? TRANSLATIONS.en[key] ?? key,
       typeLabel: (value) => dict.types[value] ?? TRANSLATIONS.en.types[value] ?? value,
-      severityLabel: (value) => dict.severities[value] ?? TRANSLATIONS.en.severities[value] ?? value,
       stepLabel: (value) => dict.steps[value] ?? TRANSLATIONS.en.steps[value] ?? value,
     }
   }, [lang])
