@@ -61,8 +61,8 @@ export default function IncidentQueueCard({ incident, isNew, onAction }) {
         </span>
       </div>
 
-      {incident.photoUrl && (
-        <img className="queue-card__photo" src={incident.photoUrl} alt="Incident scene" loading="lazy" />
+      {incident.photoViewUrl && (
+        <img className="queue-card__photo" src={incident.photoViewUrl} alt="Incident scene" loading="lazy" />
       )}
 
       <StatusBar status={incident.status} />

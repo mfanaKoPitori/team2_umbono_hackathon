@@ -71,9 +71,38 @@ export async function updateStatus(incident, newStatus) {
   return data
 }
 
-// TODO: no photo upload endpoint exists yet. Wire this up to S3 (e.g. a
-// presigned URL) once the backend supports it. Until then it resolves to
-// null and the report is submitted without a photoUrl.
-export async function uploadPhoto(_file) {
-  return null
+/**
+ * Uploads an incident photo straight to the team's S3 bucket.
+ *
+ * Asks get-reports for a presigned upload link, then posts the photo to S3.
+ * Call it before submitIncident and send the returned URL as `photoUrl`. If
+ * the report is never submitted, the photo stays in the bucket unreferenced.
+ *
+ * @param {Blob} photo JPEG, PNG or WebP image, at most 5 MB (S3 rejects
+ *   anything else). Use resizePhoto to convert a picked file.
+ * @returns {Promise<string>} S3 URL of the stored photo. The bucket is
+ *   private: display photos through the incident's `photoViewUrl`.
+ * @throws {Error} When the upload link cannot be fetched or S3 refuses the file.
+ */
+export async function uploadPhoto(photo) {
+  const linkRes = await fetch(`${API_URL}?photoUpload=${encodeURIComponent(photo.type)}`)
+  let link = null
+  try {
+    link = await linkRes.json()
+  } catch {
+    link = null
+  }
+  if (!linkRes.ok) {
+    throw new Error(link?.error || `Failed to prepare photo upload (${linkRes.status})`)
+  }
+
+  // S3 presigned POST: every policy field must come before the file.
+  const form = new FormData()
+  Object.entries(link.photoUpload.fields).forEach(([name, fieldValue]) => form.append(name, fieldValue))
+  form.append('file', photo)
+  const uploadRes = await fetch(link.photoUpload.url, { method: 'POST', body: form })
+  if (!uploadRes.ok) {
+    throw new Error(`Photo upload failed (${uploadRes.status})`)
+  }
+  return link.photoUrl
 }

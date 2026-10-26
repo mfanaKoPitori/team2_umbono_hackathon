@@ -8,6 +8,7 @@ import { Icon } from '../icons.jsx'
 import { INCIDENT_TYPES } from '../constants'
 import { useLanguage } from '../i18n.jsx'
 import { submitIncident, uploadPhoto } from '../api'
+import { resizePhoto } from '../utils/resizePhoto'
 import './Report.css'
 
 export default function ReportPage() {
@@ -83,7 +84,7 @@ export default function ReportPage() {
     setSubmitting(true)
     setErrors([])
     try {
-      const photoUrl = photoFile ? await uploadPhoto(photoFile) : null
+      const photoUrl = photoFile ? await uploadPhoto(await resizePhoto(photoFile)) : null
       const payload = {
         incidentType,
         location: location.trim(),
