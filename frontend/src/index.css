@@ -1,0 +1,113 @@
+:root {
+  /* Typography */
+  --font-ui: 'Manrope', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  /* Navy surfaces (base #232F3E) */
+  --navy-bg: #1a232f;
+  --navy-panel: #232f3e;
+  --navy-card: #2c3a4b;
+  --navy-border: #34455a;
+
+  /* Text */
+  --text: #f2f5f8;
+  --text-muted: #a9b6c4;
+  --text-faint: #7c8a9a;
+
+  /* Brand */
+  --accent: #ff9900;
+  --accent-strong: #e68a00;
+  --accent-contrast: #232f3e;
+  --accent-soft: rgba(255, 153, 0, 0.14);
+  --cream: #fff8ec;
+  --ai-purple: #c77dff;
+  --ai-purple-soft: rgba(199, 125, 255, 0.14);
+  --live-green: #3ddc84;
+  --live-green-soft: rgba(61, 220, 132, 0.14);
+
+  /* Severity */
+  --critical: #ff4d5e;
+  --critical-soft: rgba(255, 77, 94, 0.16);
+  --high: #ff6b3d;
+  --high-soft: rgba(255, 107, 61, 0.16);
+  --medium: #ffd24c;
+  --medium-soft: rgba(255, 210, 76, 0.16);
+  --low: #4da3ff;
+  --low-soft: rgba(77, 163, 255, 0.16);
+
+  /* Danger (errors, not severity) */
+  --danger: #ff4d5e;
+  --danger-soft: rgba(255, 77, 94, 0.14);
+
+  /* Shape */
+  --radius-sm: 12px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.25), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 24px 64px -16px rgba(0, 0, 0, 0.7);
+
+  font-family: var(--font-ui);
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--navy-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--navy-bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
