@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchIncidents, updateStatus as apiUpdateStatus } from '../api'
+import { STATUS_STEPS } from '../constants'
 import { usePolling } from './usePolling'
 
 const HIGHLIGHT_MS = 4000
+
+// Statuses only move forward, so a status behind one this browser saved comes
+// from a read that started before the save landed.
+function isStatusBehind(status, savedStatus) {
+  return STATUS_STEPS.indexOf(status) < STATUS_STEPS.indexOf(savedStatus)
+}
 
 export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
   const [incidents, setIncidents] = useState([])
@@ -16,8 +23,17 @@ export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
   const shown = useRef(null)
   // Status changes sent from this browser that the server hasn't confirmed yet
   const pendingStatus = useRef(new Map())
+  // Status changes the server accepted, kept until a load returns them
+  const savedStatus = useRef(new Map())
+  // Latest status per incident as the server reported it
+  const serverStatus = useRef(new Map())
   // Bumped whenever a status change settles, so older responses are dropped
   const statusVersion = useRef(0)
+  // reload() can run alongside a poll, so responses may arrive out of order.
+  // Numbering requests lets an older response be dropped once a newer one
+  // has been shown.
+  const lastRequest = useRef(0)
+  const lastShownRequest = useRef(0)
 
   const highlight = useCallback((ids) => {
     setHighlighted((prev) => new Set([...prev, ...ids]))
@@ -32,17 +48,26 @@ export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
 
   const load = useCallback(async () => {
     const version = statusVersion.current
+    const request = ++lastRequest.current
     try {
       const data = await fetchIncidents()
       // A status change finished while this was in flight, so the response
       // may predate it. The reload that change triggers will be accurate.
       if (version !== statusVersion.current) return
+      if (request < lastShownRequest.current) return
+      lastShownRequest.current = request
 
-      const list = (data.incidents ?? []).map((i) =>
-        pendingStatus.current.has(i.incidentId)
-          ? { ...i, status: pendingStatus.current.get(i.incidentId) }
-          : i,
-      )
+      const incidents = data.incidents ?? []
+      serverStatus.current = new Map(incidents.map((i) => [i.incidentId, i.status]))
+      const list = incidents.map((i) => {
+        const pending = pendingStatus.current.get(i.incidentId)
+        if (pending) return { ...i, status: pending }
+        const saved = savedStatus.current.get(i.incidentId)
+        if (saved && isStatusBehind(i.status, saved)) return { ...i, status: saved }
+        // The server has caught up with the save, or moved past it
+        savedStatus.current.delete(i.incidentId)
+        return i
+      })
 
       if (shown.current) {
         // New incidents, and ones another responder moved along
@@ -63,7 +88,8 @@ export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
       setError(null)
       setLastUpdated(Date.now())
     } catch (err) {
-      setError(err.message)
+      // Stay live if a newer request has already succeeded
+      if (request > lastShownRequest.current) setError(err.message)
       throw err
     } finally {
       setLoading(false)
@@ -83,7 +109,7 @@ export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
   }, [])
 
   const setStatus = useCallback(async (incident, newStatus) => {
-    const { incidentId, status: previousStatus } = incident
+    const { incidentId } = incident
 
     pendingStatus.current.set(incidentId, newStatus)
     shown.current?.set(incidentId, newStatus)
@@ -93,10 +119,16 @@ export function useIncidents({ pollMs = 5000, hiddenPollMs = 30000 } = {}) {
 
     try {
       await apiUpdateStatus(incident, newStatus)
+      savedStatus.current.set(incidentId, newStatus)
       setStatusError(null)
     } catch (err) {
       // Roll back the optimistic update — the server rejected the change
       // (e.g. a 409 because someone else already moved it past this step).
+      // Use the latest status loaded, which may be newer than the clicked card.
+      const previousStatus =
+        savedStatus.current.get(incidentId) ??
+        serverStatus.current.get(incidentId) ??
+        incident.status
       shown.current?.set(incidentId, previousStatus)
       setIncidents((prev) =>
         prev.map((i) => (i.incidentId === incidentId ? { ...i, status: previousStatus } : i)),

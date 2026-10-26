@@ -73,6 +73,7 @@ class GetReportsTestCase(unittest.TestCase):
     def setUp(self):
         TABLE.items = make_incidents()
         TABLE.has_index = True
+        TABLE.stale_items = None
         lf._index_missing_until = 0.0
         S3.presigned.clear()
 
@@ -220,6 +221,41 @@ class MissingIndexFallbackTests(GetReportsTestCase):
         self.assertEqual([op for op, _ in TABLE.calls], ['query'])
 
 
+class ConsistentReadTests(GetReportsTestCase):
+    """The dashboard reloads straight after a write, before replicas catch up."""
+
+    def setUp(self):
+        super().setUp()
+        TABLE.stale_items = [dict(i) for i in TABLE.items]
+        TABLE.items[0]['status'] = 'acknowledged'
+        TABLE.items.append(dict(TABLE.items[1], incidentId='just-submitted',
+                                timestamp='2026-10-27T23:59:00Z', status='new'))
+
+    def test_list_returns_status_changed_just_before(self):
+        _, body = invoke({})
+        statuses = {i['incidentId']: i['status'] for i in body['incidents']}
+        self.assertEqual(statuses['id000'], 'acknowledged')
+
+    def test_list_returns_incident_submitted_just_before(self):
+        _, body = invoke({})
+        self.assertEqual(body['incidents'][0]['incidentId'], 'just-submitted')
+
+    def test_every_page_reads_consistently(self):
+        ids = fetch_all_pages({'limit': '7'})
+        self.assertIn('just-submitted', ids)
+        self.assertTrue(all(kwargs['ConsistentRead'] for _, kwargs in TABLE.calls))
+
+    def test_fallback_scan_reads_consistently(self):
+        TABLE.has_index = False
+        _, body = invoke({'status': 'acknowledged'})
+        self.assertIn('id000', [i['incidentId'] for i in body['incidents']])
+
+    def test_index_query_does_not_ask_for_consistent_read(self):
+        status, _ = invoke({'status': 'new'})
+        self.assertEqual(status, 200)
+        self.assertNotIn('ConsistentRead', TABLE.calls[0][1])
+
+
 class TextFilterTests(GetReportsTestCase):
     def test_location_filter_is_case_insensitive(self):
         ids = fetch_all_pages({'location': 'RIVONIA', 'limit': '2'})
@@ -315,7 +351,7 @@ class SeveritySortTests(GetReportsTestCase):
 class PaginationTokenTests(GetReportsTestCase):
     def test_limit_is_capped(self):
         invoke({'limit': '999'})
-        self.assertEqual(TABLE.calls[0], ('scan', {'Limit': lf.MAX_LIMIT}))
+        self.assertEqual(TABLE.calls[0], ('scan', {'ConsistentRead': True, 'Limit': lf.MAX_LIMIT}))
 
     def test_token_round_trips_decimal_keys(self):
         key = {'incidentId': 'a', 'timestamp': 't', 'score': Decimal('5'), 'ratio': Decimal('0.5')}

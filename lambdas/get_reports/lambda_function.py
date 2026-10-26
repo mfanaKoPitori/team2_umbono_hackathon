@@ -250,7 +250,11 @@ def lambda_handler(event, context):
         if items is None:
             # No index to query on, so fall back to a paginated scan.
             # Sorting only applies within the returned page.
-            kwargs = dict(base_kwargs,
+            # Consistent reads, because the dashboard reloads straight after a
+            # status change or new report and an eventually consistent scan
+            # can still return the previous version. The index query above
+            # cannot do this: global secondary indexes only read eventually.
+            kwargs = dict(base_kwargs, ConsistentRead=True,
                           Limit=read_size(bool(status_filter or type_filter or location or search)))
             filters = []
             if status_filter:
