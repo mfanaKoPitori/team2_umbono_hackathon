@@ -3,8 +3,10 @@
 `install()` registers fake `boto3`, `boto3.dynamodb.conditions`,
 `botocore.config` and `botocore.exceptions` modules. The fake table mimics
 the DynamoDB behaviour the lambdas rely on: `Limit` counts items evaluated
-before filtering, `LastEvaluatedKey` is returned while more items remain, and
-querying a missing index raises a ValidationException. The fake S3 client
+before filtering, `LastEvaluatedKey` is returned while more items remain,
+querying a missing index or asking an index for a consistent read raises a
+ValidationException, and setting `stale_items` makes eventually consistent
+reads return an older copy of the table. The fake S3 client
 records presign requests and returns recognisable URLs.
 """
 import sys
@@ -44,6 +46,9 @@ class FakeTable:
         self.items = []
         self.calls = []
         self.has_index = True
+        # What an eventually consistent read returns while replicas lag behind
+        # `items`; None means every read sees the latest writes.
+        self.stale_items = None
 
     def query(self, **kwargs):
         self.calls.append(('query', kwargs))
@@ -51,13 +56,23 @@ class FakeTable:
             raise ClientError({'Error': {'Code': 'ValidationException',
                                          'Message': 'The table does not have the specified index'}},
                               'Query')
-        rows = [i for i in self.items if kwargs['KeyConditionExpression'](i)]
+        if kwargs.get('ConsistentRead') and kwargs.get('IndexName'):
+            raise ClientError({'Error': {'Code': 'ValidationException',
+                                         'Message': 'Consistent reads are not supported on global '
+                                                    'secondary indexes'}},
+                              'Query')
+        rows = [i for i in self._readable(kwargs) if kwargs['KeyConditionExpression'](i)]
         rows.sort(key=lambda i: i['timestamp'], reverse=not kwargs.get('ScanIndexForward', True))
         return self._page(rows, kwargs, STATUS_INDEX_KEYS)
 
     def scan(self, **kwargs):
         self.calls.append(('scan', kwargs))
-        return self._page(list(self.items), kwargs, TABLE_KEYS)
+        return self._page(list(self._readable(kwargs)), kwargs, TABLE_KEYS)
+
+    def _readable(self, kwargs):
+        if self.stale_items is None or kwargs.get('ConsistentRead'):
+            return self.items
+        return self.stale_items
 
     def _page(self, rows, kwargs, key_attrs):
         start = 0
