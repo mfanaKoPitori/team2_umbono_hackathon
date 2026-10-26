@@ -10,17 +10,20 @@ import pathlib
 import unittest
 from decimal import Decimal
 
-import fake_dynamodb
+import fake_aws
 
-fake_dynamodb.install()
-os.environ.setdefault('TABLE_NAME', 'test-incidents')
+fake_aws.install()
+os.environ['TABLE_NAME'] = 'test-incidents'
+os.environ['BUCKET_NAME'] = 'test-photos'
+os.environ['AWS_REGION'] = 'af-south-1'
 
 _SOURCE = pathlib.Path(__file__).resolve().parents[1] / 'lambdas' / 'get_reports' / 'lambda_function.py'
 _spec = importlib.util.spec_from_file_location('get_reports_lambda', _SOURCE)
 lf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(lf)
 
-TABLE = fake_dynamodb.TABLE
+TABLE = fake_aws.TABLE
+S3 = fake_aws.S3
 SEVERITIES = ['low', 'critical', 'medium', 'high', None]
 
 
@@ -71,6 +74,7 @@ class GetReportsTestCase(unittest.TestCase):
         TABLE.items = make_incidents()
         TABLE.has_index = True
         lf._index_missing_until = 0.0
+        S3.presigned.clear()
 
 
 class ResponseShapeTests(GetReportsTestCase):
@@ -122,7 +126,7 @@ class StatusIndexTests(GetReportsTestCase):
         original_query = TABLE.query
 
         def throttled(**kwargs):
-            raise fake_dynamodb.ClientError(
+            raise fake_aws.ClientError(
                 {'Error': {'Code': 'ProvisionedThroughputExceededException', 'Message': 'slow down'}},
                 'Query')
 
@@ -278,6 +282,70 @@ class PaginationTokenTests(GetReportsTestCase):
                          {'incidentId': first['incidents'][-1]['incidentId'],
                           'timestamp': first['incidents'][-1]['timestamp'],
                           'status': 'new'})
+
+
+class PhotoUrlTests(GetReportsTestCase):
+    def photo_view_url(self, photo_url):
+        TABLE.items = [dict(make_incidents(1)[0], photoUrl=photo_url)]
+        _, body = invoke(None)
+        return body['incidents'][0].get('photoViewUrl')
+
+    def test_s3_client_uses_regional_endpoint(self):
+        self.assertEqual(S3.client_kwargs['region_name'], 'af-south-1')
+        self.assertEqual(S3.client_kwargs['endpoint_url'], 'https://s3.af-south-1.amazonaws.com')
+
+    def test_signs_virtual_hosted_url(self):
+        url = self.photo_view_url(
+            'https://test-photos.s3.af-south-1.amazonaws.com/photos/id000/abc.jpg')
+        self.assertEqual(url, 'https://signed.example/test-photos/photos/id000/abc.jpg?expires=3600')
+        self.assertEqual(S3.presigned, [('get_object',
+                                         {'Bucket': 'test-photos', 'Key': 'photos/id000/abc.jpg'},
+                                         3600)])
+
+    def test_signs_global_and_path_style_urls(self):
+        for photo_url in ('https://test-photos.s3.amazonaws.com/photos/a.jpg',
+                          'https://s3.af-south-1.amazonaws.com/test-photos/photos/a.jpg',
+                          'https://s3.amazonaws.com/test-photos/photos/a.jpg'):
+            with self.subTest(photo_url):
+                self.assertEqual(self.photo_view_url(photo_url),
+                                 'https://signed.example/test-photos/photos/a.jpg?expires=3600')
+
+    def test_decodes_escaped_keys(self):
+        url = self.photo_view_url('https://test-photos.s3.af-south-1.amazonaws.com/photos/my%20pic.jpg')
+        self.assertEqual(S3.presigned[0][1]['Key'], 'photos/my pic.jpg')
+        self.assertIsNotNone(url)
+
+    def test_keeps_stored_photo_url(self):
+        photo_url = 'https://test-photos.s3.af-south-1.amazonaws.com/photos/a.jpg'
+        TABLE.items = [dict(make_incidents(1)[0], photoUrl=photo_url)]
+        _, body = invoke(None)
+        self.assertEqual(body['incidents'][0]['photoUrl'], photo_url)
+
+    def test_ignores_urls_outside_our_bucket(self):
+        for photo_url in ('https://other-bucket.s3.af-south-1.amazonaws.com/photos/a.jpg',
+                          'https://s3.af-south-1.amazonaws.com/other-bucket/a.jpg',
+                          'https://s3.af-south-1.amazonaws.com/test-photos-evil/a.jpg',
+                          'https://test-photos.s3.af-south-1.amazonaws.com.evil.com/a.jpg',
+                          'http://test-photos.s3.af-south-1.amazonaws.com/a.jpg',
+                          'https://evil.example/a.jpg',
+                          'https://test-photos.s3.af-south-1.amazonaws.com/',
+                          'not a url', 42):
+            with self.subTest(photo_url):
+                self.assertIsNone(self.photo_view_url(photo_url))
+        self.assertEqual(S3.presigned, [])
+
+    def test_incidents_without_photos_are_unchanged(self):
+        _, body = invoke(None)
+        self.assertTrue(all('photoViewUrl' not in i for i in body['incidents']))
+        self.assertEqual(S3.presigned, [])
+
+    def test_no_signing_when_bucket_not_configured(self):
+        lf.BUCKET_NAME, original = None, lf.BUCKET_NAME
+        try:
+            url = self.photo_view_url('https://test-photos.s3.af-south-1.amazonaws.com/a.jpg')
+        finally:
+            lf.BUCKET_NAME = original
+        self.assertIsNone(url)
 
 
 class ValidationTests(GetReportsTestCase):

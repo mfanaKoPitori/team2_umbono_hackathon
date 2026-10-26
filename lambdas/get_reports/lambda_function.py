@@ -3,13 +3,22 @@ import json
 import os
 import time
 from decimal import Decimal
+from urllib.parse import unquote, urlparse
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 dynamodb = boto3.resource('dynamodb')
 TABLE_NAME = os.environ['TABLE_NAME']
+# Photos bucket; when unset, incidents are returned without photoViewUrl
+BUCKET_NAME = os.environ.get('BUCKET_NAME')
+REGION = os.environ.get('AWS_REGION', 'af-south-1')
+# af-south-1 is an opt-in region, so presigned URLs must use its regional endpoint
+s3 = boto3.client('s3', region_name=REGION, endpoint_url=f'https://s3.{REGION}.amazonaws.com',
+                  config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}))
+PHOTO_URL_EXPIRY_SECONDS = 3600
 # GSI with partition key `status` and sort key `timestamp`
 STATUS_INDEX_NAME = os.environ.get('STATUS_INDEX_NAME', 'status-timestamp-index')
 
@@ -90,6 +99,41 @@ def _decode_token(token):
 def _is_missing_index(error):
     err = error.response.get('Error', {})
     return err.get('Code') == 'ValidationException' and 'index' in err.get('Message', '').lower()
+
+
+def _photo_key(photo_url):
+    """Return the object key if photo_url points into our bucket, else None.
+
+    Accepts virtual-hosted (bucket.s3[.region].amazonaws.com/key) and
+    path-style (s3[.region].amazonaws.com/bucket/key) URLs.
+    """
+    if not isinstance(photo_url, str):
+        return None
+    try:
+        parsed = urlparse(photo_url)
+    except ValueError:
+        return None
+    if parsed.scheme != 'https':
+        return None
+    host, path = parsed.netloc.lower(), unquote(parsed.path).lstrip('/')
+    s3_hosts = ('s3.amazonaws.com', f's3.{REGION}.amazonaws.com')
+    if host in tuple(f'{BUCKET_NAME}.{h}' for h in s3_hosts):
+        key = path
+    elif host in s3_hosts and path.startswith(f'{BUCKET_NAME}/'):
+        key = path[len(BUCKET_NAME) + 1:]
+    else:
+        return None
+    return key or None
+
+
+def _add_photo_view_url(item):
+    # A signed link works whether or not the bucket is public. Photos hosted
+    # anywhere else are not linked, to avoid showing untrusted URLs.
+    key = _photo_key(item.get('photoUrl')) if BUCKET_NAME else None
+    if key:
+        item['photoViewUrl'] = s3.generate_presigned_url(
+            'get_object', Params={'Bucket': BUCKET_NAME, 'Key': key},
+            ExpiresIn=PHOTO_URL_EXPIRY_SECONDS)
 
 
 def _matches_text(item, location, search):
@@ -189,6 +233,8 @@ def lambda_handler(event, context):
             # Stable sort keeps newest-first within each severity
             items.sort(key=lambda x: SEVERITY_RANK.get(x.get('severity'), len(SEVERITY_RANK)),
                        reverse=order == 'asc')
+        for item in items:
+            _add_photo_view_url(item)
 
         body = {'incidents': items, 'count': len(items)}
         if last_key:

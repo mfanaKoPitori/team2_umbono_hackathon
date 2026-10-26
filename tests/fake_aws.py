@@ -1,10 +1,11 @@
 """In-memory stand-ins for boto3/botocore, so lambdas can be tested without AWS.
 
-`install()` registers fake `boto3`, `boto3.dynamodb.conditions` and
-`botocore.exceptions` modules. The fake table mimics the DynamoDB behaviour
-the lambdas rely on: `Limit` counts items evaluated before filtering,
-`LastEvaluatedKey` is returned while more items remain, and querying a
-missing index raises a ValidationException.
+`install()` registers fake `boto3`, `boto3.dynamodb.conditions`,
+`botocore.config` and `botocore.exceptions` modules. The fake table mimics
+the DynamoDB behaviour the lambdas rely on: `Limit` counts items evaluated
+before filtering, `LastEvaluatedKey` is returned while more items remain, and
+querying a missing index raises a ValidationException. The fake S3 client
+records presign requests and returns recognisable URLs.
 """
 import sys
 import types
@@ -73,16 +74,36 @@ class FakeTable:
         return response
 
 
+class FakeS3:
+    def __init__(self):
+        self.client_kwargs = None
+        self.presigned = []
+
+    def generate_presigned_url(self, operation, Params, ExpiresIn):
+        self.presigned.append((operation, Params, ExpiresIn))
+        return f"https://signed.example/{Params['Bucket']}/{Params['Key']}?expires={ExpiresIn}"
+
+
 TABLE = FakeTable()
+S3 = FakeS3()
+
+
+def _client(service, **kwargs):
+    assert service == 's3', service
+    S3.client_kwargs = kwargs
+    return S3
 
 
 def install():
     boto3 = types.ModuleType('boto3')
     boto3.resource = lambda name: types.SimpleNamespace(Table=lambda table_name: TABLE)
+    boto3.client = _client
     dynamodb = types.ModuleType('boto3.dynamodb')
     conditions = types.ModuleType('boto3.dynamodb.conditions')
     conditions.Attr = conditions.Key = Attribute
     botocore = types.ModuleType('botocore')
+    config = types.ModuleType('botocore.config')
+    config.Config = lambda **kwargs: kwargs
     exceptions = types.ModuleType('botocore.exceptions')
     exceptions.ClientError = ClientError
     sys.modules.update({
@@ -90,5 +111,6 @@ def install():
         'boto3.dynamodb': dynamodb,
         'boto3.dynamodb.conditions': conditions,
         'botocore': botocore,
+        'botocore.config': config,
         'botocore.exceptions': exceptions,
     })
