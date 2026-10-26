@@ -128,7 +128,6 @@ def validate(body):
     description = clean_text(body.get('description'), 2000)
     location = clean_text(body.get('location'), 300)
     incident_type = clean_text(body.get('incidentType'), 50).lower() or 'other'
-    reported_severity = clean_text(body.get('severity'), 20).lower()
     photo_url = clean_text(body.get('photoUrl'), 1000)
     is_anonymous = body.get('isAnonymous') in (True, 'true', 'True', 1, '1')
     reporter_name = 'Anonymous' if is_anonymous else (clean_text(body.get('reporterName'), 100) or 'Anonymous')
@@ -148,14 +147,12 @@ def validate(body):
         errors.append('a location or GPS coordinates are required')
     if incident_type not in VALID_TYPES:
         errors.append('incidentType must be one of: ' + ', '.join(sorted(VALID_TYPES)))
-    if reported_severity and reported_severity not in VALID_SEVERITIES:
-        errors.append('severity must be critical, high, medium or low')
     if photo_url and not photo_url.startswith(PHOTO_URL_PREFIX):
         errors.append('photoUrl must point to the team2 photos bucket')
 
     data = {
         'description': description, 'location': location, 'incidentType': incident_type,
-        'reportedSeverity': reported_severity, 'photoUrl': photo_url, 'isAnonymous': is_anonymous,
+        'photoUrl': photo_url, 'isAnonymous': is_anonymous,
         'reporterName': reporter_name, 'latitude': latitude, 'longitude': longitude,
         'source': clean_text(body.get('source'), 20) or 'web',
     }
@@ -215,8 +212,8 @@ def lambda_handler(event, context):
         if not location_text and data['latitude'] is not None:
             location_text = f"GPS {data['latitude']:.6f}, {data['longitude']:.6f}"
 
-        # TODO #1: AI triage. If Bedrock fails, the report is still saved using the reporter's own choices.
-        ai_severity = data['reportedSeverity'] or 'medium'
+        # TODO #1: AI triage. If Bedrock fails, the report is still saved with a safe default severity.
+        ai_severity = 'medium'
         ai_summary = 'Pending AI triage'
         ai_category = data['incidentType']
         try:
@@ -234,7 +231,6 @@ def lambda_handler(event, context):
             'updatedAt': timestamp, 'reporterName': data['reporterName'],
             'isAnonymous': data['isAnonymous'], 'incidentType': data['incidentType'],
             'location': location_text, 'description': data['description'],
-            'reportedSeverity': data['reportedSeverity'] or 'not_given',
             'severity': ai_severity, 'aiSummary': ai_summary, 'aiCategory': ai_category,
             'status': 'new', 'statusHistory': [{'status': 'new', 'at': timestamp}],
             'source': data['source'],
