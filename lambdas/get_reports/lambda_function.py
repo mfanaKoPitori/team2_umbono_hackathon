@@ -17,6 +17,9 @@ DEFAULT_LIMIT = 50
 MAX_LIMIT = 100
 # Upper bound on DynamoDB round trips per request when text filters drop most items
 MAX_PAGES = 10
+# Items DynamoDB evaluates per call when filters may drop some. Larger batches
+# mean fewer round trips; surplus matches are cut and resumed via nextToken.
+FILTERED_READ_SIZE = 100
 # After the index is found missing, skip it for this long before trying again,
 # so warm containers pick up the index soon after it's created
 INDEX_RETRY_SECONDS = 300
@@ -134,7 +137,11 @@ def lambda_handler(event, context):
         location = (params.get('location') or '').strip().lower()
         search = (params.get('q') or '').strip().lower()
 
-        base_kwargs = {'Limit': limit}
+        def read_size(filtered):
+            # Unfiltered reads return every item evaluated, so read exactly one page
+            return max(limit, FILTERED_READ_SIZE) if filtered else limit
+
+        base_kwargs = {}
         if params.get('nextToken'):
             base_kwargs['ExclusiveStartKey'] = _decode_token(params['nextToken'])
 
@@ -142,6 +149,7 @@ def lambda_handler(event, context):
         if status_filter and time.monotonic() >= _index_missing_until:
             # Query the GSI: reads only matching items, already sorted by timestamp
             kwargs = dict(base_kwargs,
+                          Limit=read_size(bool(type_filter or location or search)),
                           IndexName=STATUS_INDEX_NAME,
                           KeyConditionExpression=Key('status').eq(status_filter),
                           ScanIndexForward=order == 'asc')
@@ -160,7 +168,8 @@ def lambda_handler(event, context):
         if items is None:
             # No index to query on, so fall back to a paginated scan.
             # Sorting only applies within the returned page.
-            kwargs = dict(base_kwargs)
+            kwargs = dict(base_kwargs,
+                          Limit=read_size(bool(status_filter or type_filter or location or search)))
             filters = []
             if status_filter:
                 filters.append(Attr('status').eq(status_filter))
