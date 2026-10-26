@@ -20,7 +20,8 @@ export async function fetchIncidents() {
     const url = new URL(API_URL)
     url.searchParams.set('limit', PAGE_SIZE)
     if (nextToken) url.searchParams.set('nextToken', nextToken)
-    const res = await fetch(url)
+    // The feed must always come from the API, never the HTTP cache
+    const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) {
       throw new Error(`Failed to load incidents (${res.status})`)
     }

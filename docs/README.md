@@ -163,7 +163,12 @@ table and DynamoDB streams on the incidents table — resources we can't create.
   online. Only one request runs at a time. After a failure the wait doubles
   (up to 1 minute), and the dashboard's Live pill shows **Reconnecting**.
 - A poll that was in flight when a responder changed a status is discarded,
-  so it can't briefly undo the change on screen.
+  so it can't briefly undo the change on screen. A saved status also stays on
+  screen until a load returns it, and a response that arrives after a newer
+  one is ignored.
+- `GET /reports` reads the table with consistent reads (not the status index
+  query, which DynamoDB only reads eventually), so the reload straight after
+  a status change or new report sees it.
 
 ## Tests
 
@@ -175,6 +180,12 @@ python3 -m unittest discover -s tests -v
 
 `tests/fake_aws.py` is an in-memory fake of the DynamoDB and S3 behaviour the
 lambdas use, reusable for other lambdas' tests.
+
+Frontend (Vitest, from `frontend/`):
+
+```
+npm test
+```
 
 ## Deploying a lambda
 
