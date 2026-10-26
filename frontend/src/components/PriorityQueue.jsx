@@ -17,7 +17,7 @@ function matchesFilter(incident, filter) {
     case 'new':
       return incident.status === 'new'
     case 'has_photo':
-      return Boolean(incident.photoUrl)
+      return Boolean(incident.photoViewUrl)
     case 'all_open':
     default:
       return incident.status !== 'resolved'

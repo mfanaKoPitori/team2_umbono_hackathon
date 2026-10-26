@@ -8,6 +8,7 @@ import { Icon } from '../icons.jsx'
 import { INCIDENT_TYPES } from '../constants'
 import { useLanguage } from '../i18n.jsx'
 import { submitIncident, uploadPhoto } from '../api'
+import { resizePhoto } from '../utils/resizePhoto'
 import './Report.css'
 
 export default function ReportPage() {
@@ -83,7 +84,19 @@ export default function ReportPage() {
     setSubmitting(true)
     setErrors([])
     try {
-      const photoUrl = photoFile ? await uploadPhoto(photoFile) : null
+      // The report matters more than the photo: if the photo can't be
+      // processed or uploaded, send the report without it and say so on the
+      // confirmation page.
+      let photoUrl = null
+      let wasPhotoDropped = false
+      if (photoFile) {
+        try {
+          photoUrl = await uploadPhoto(await resizePhoto(photoFile))
+        } catch (err) {
+          console.warn('Photo upload failed; sending the report without it', err)
+          wasPhotoDropped = true
+        }
+      }
       const payload = {
         incidentType,
         location: location.trim(),
@@ -94,7 +107,7 @@ export default function ReportPage() {
         ...(photoUrl ? { photoUrl } : {}),
       }
       const data = await submitIncident(payload)
-      navigate(`/submitted/${data.incidentId}`)
+      navigate(`/submitted/${data.incidentId}`, { state: { wasPhotoDropped } })
     } catch (err) {
       setErrors(err.details?.length ? err.details : [err.message || t('errorGeneric')])
     } finally {

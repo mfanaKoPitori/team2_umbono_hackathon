@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
-import { CheckCircle2, ShieldAlert } from 'lucide-react'
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
+import { CheckCircle2, ImageOff, ShieldAlert } from 'lucide-react'
 import ResidentHeader from '../components/ResidentHeader'
 import Footer from '../components/Footer'
 import SeverityPill from '../components/SeverityPill'
@@ -15,6 +15,7 @@ import './Confirmation.css'
 export default function ConfirmationPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const wasPhotoDropped = Boolean(useLocation().state?.wasPhotoDropped)
   const { t } = useLanguage()
   const [incident, setIncident] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -49,6 +50,13 @@ export default function ConfirmationPage() {
             {t('refLabel')} {refCode(id)} · {time}
           </p>
         </div>
+
+        {wasPhotoDropped && (
+          <div className="alert alert--warning" role="status">
+            <ImageOff size={16} />
+            <span>{t('photoDropped')}</span>
+          </div>
+        )}
 
         <div className="card confirmation__panel">
           <SparkleLabel>{t('aiTriageTitle')}</SparkleLabel>
