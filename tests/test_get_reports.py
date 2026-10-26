@@ -102,6 +102,55 @@ class ResponseShapeTests(GetReportsTestCase):
         self.assertEqual(body['error'], 'boom')
 
 
+class PrivacyTests(GetReportsTestCase):
+    def setUp(self):
+        super().setUp()
+        for item in TABLE.items:
+            item['reporterName'] = 'Jane Smith'
+
+    def assertNoReporterName(self, incidents):
+        self.assertGreater(len(incidents), 0)
+        self.assertTrue(all('reporterName' not in i for i in incidents))
+
+    def test_reporter_name_stripped_from_unfiltered_scan(self):
+        _, body = invoke(None)
+        self.assertNoReporterName(body['incidents'])
+
+    def test_reporter_name_stripped_from_status_index_query(self):
+        _, body = invoke({'status': 'new'})
+        self.assertEqual(TABLE.calls[0][0], 'query')
+        self.assertNoReporterName(body['incidents'])
+
+    def test_reporter_name_stripped_from_filtered_fallback_scan(self):
+        TABLE.has_index = False
+        _, body = invoke({'status': 'new', 'type': 'fire'})
+        self.assertEqual(TABLE.calls[-1][0], 'scan')
+        self.assertNoReporterName(body['incidents'])
+
+    def test_reporter_name_stripped_across_every_page(self):
+        token, pages_seen = None, 0
+        for _ in range(100):
+            params = {'limit': '4', 'nextToken': token} if token else {'limit': '4'}
+            status, body = invoke(params)
+            self.assertEqual(status, 200)
+            self.assertNoReporterName(body['incidents'])
+            pages_seen += 1
+            token = body.get('nextToken')
+            if not token:
+                break
+        else:
+            raise AssertionError('pagination did not terminate')
+        self.assertGreater(pages_seen, 1)
+
+    def test_reporter_name_stripped_alongside_photo_view_url(self):
+        TABLE.items = [dict(make_incidents(1)[0], reporterName='Jane Smith',
+                            photoUrl='https://test-photos.s3.af-south-1.amazonaws.com/photos/a.jpg')]
+        _, body = invoke(None)
+        incident = body['incidents'][0]
+        self.assertNotIn('reporterName', incident)
+        self.assertIn('photoViewUrl', incident)
+
+
 class StatusIndexTests(GetReportsTestCase):
     def test_status_filter_queries_index(self):
         invoke({'status': 'new'})

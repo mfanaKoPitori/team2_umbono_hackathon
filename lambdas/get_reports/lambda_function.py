@@ -130,6 +130,12 @@ def _photo_key(photo_url):
     return key or None
 
 
+def _remove_reporter_name(item):
+    # Reporter names are collected for accountability but must never be
+    # exposed to anyone reading incidents back out.
+    item.pop('reporterName', None)
+
+
 def _add_photo_view_url(item):
     # A signed link works whether or not the bucket is public. Photos hosted
     # anywhere else are not linked, to avoid showing untrusted URLs.
@@ -266,6 +272,7 @@ def lambda_handler(event, context):
             items.sort(key=lambda x: SEVERITY_RANK.get(x.get('severity'), len(SEVERITY_RANK)),
                        reverse=order == 'asc')
         for item in items:
+            _remove_reporter_name(item)
             _add_photo_view_url(item)
 
         body = {'incidents': items, 'count': len(items)}
