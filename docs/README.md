@@ -140,7 +140,9 @@ await fetch(`${API}/reports`, { method: 'POST', headers: { 'Content-Type': 'appl
 The resident app does this in `uploadPhoto` (`frontend/src/api.js`). Before
 uploading, `resizePhoto` re-encodes the picked image as a JPEG of at most
 1600 px, which keeps phone photos under 5 MB, converts HEIC, and strips EXIF
-data such as GPS. The dashboard shows photos through `photoViewUrl`.
+data such as GPS. If the photo fails, the report is still sent without it and
+the confirmation page says so. The dashboard shows photos through
+`photoViewUrl`.
 
 The upload link comes from `GET /reports` so no new AWS resources are needed;
 it would sit better on its own endpoint if the organisers can add one. Photos uploaded for reports

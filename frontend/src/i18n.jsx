@@ -65,6 +65,7 @@ const TRANSLATIONS = {
     reportAnother: 'Report another',
     back: 'Back',
     processingFallback: "We're processing your report.",
+    photoDropped: "Your report was sent, but the photo couldn't be uploaded.",
   },
   zu: {
     title: 'Kwenzekeni?',
@@ -110,6 +111,7 @@ const TRANSLATIONS = {
     reportAnother: 'Bika okunye',
     back: 'Emuva',
     processingFallback: 'Sisalungiselela umbiko wakho.',
+    photoDropped: 'Umbiko wakho uthunyelwe, kodwa isithombe asikwazanga ukulayishwa.',
   },
   af: {
     title: 'Wat het gebeur?',
@@ -155,6 +157,7 @@ const TRANSLATIONS = {
     reportAnother: "Rapporteer 'n ander",
     back: 'Terug',
     processingFallback: 'Ons verwerk tans jou verslag.',
+    photoDropped: 'Jou verslag is gestuur, maar die foto kon nie opgelaai word nie.',
   },
 }
 
