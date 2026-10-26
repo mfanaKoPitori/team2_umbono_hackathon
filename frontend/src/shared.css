@@ -143,6 +143,16 @@
   animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
+.pill--live.pill--offline {
+  color: var(--high);
+  background: var(--high-soft);
+}
+
+.pill--live.pill--offline .pill__dot {
+  background: var(--high);
+  animation: none;
+}
+
 @keyframes pulse-dot {
   0%,
   100% {
